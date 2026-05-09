@@ -1,25 +1,17 @@
 import { useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COURTS } from '@/data/courts';
 import { useAppStore } from '@/store/useAppStore';
-import { CourtMarker } from '@/components/CourtMarker';
+import { CourtsMap, type CourtsMapHandle } from '@/components/CourtsMap';
 import { CourtPreviewCard } from '@/components/CourtPreviewCard';
 import { colors } from '@/theme/colors';
 import type { CourtType } from '@/types';
 
-const SYDNEY_REGION = {
-  latitude: -33.885,
-  longitude: 151.215,
-  latitudeDelta: 0.08,
-  longitudeDelta: 0.06,
-};
-
 type FilterKey = 'all' | CourtType;
 
 export default function MapScreen() {
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<CourtsMapHandle>(null);
   const sessions = useAppStore((s) => s.sessions);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterKey>('all');
@@ -44,51 +36,22 @@ export default function MapScreen() {
     [selectedId],
   );
 
-  const focusCourt = (id: string, lat: number, lng: number) => {
+  const handleSelect = (id: string) => {
     setSelectedId(id);
-    mapRef.current?.animateToRegion(
-      {
-        latitude: lat - 0.005,
-        longitude: lng,
-        latitudeDelta: 0.02,
-        longitudeDelta: 0.02,
-      },
-      350,
-    );
+    const court = COURTS.find((c) => c.id === id);
+    if (court) mapRef.current?.focusCourt(court.latitude, court.longitude);
   };
 
   return (
     <View style={styles.container}>
-      <MapView
+      <CourtsMap
         ref={mapRef}
-        style={StyleSheet.absoluteFill}
-        provider={PROVIDER_DEFAULT}
-        initialRegion={SYDNEY_REGION}
-        showsUserLocation
-        showsMyLocationButton={false}
-        showsCompass={false}
-        toolbarEnabled={false}
-        onPress={() => setSelectedId(null)}
-      >
-        {visibleCourts.map((court) => (
-          <Marker
-            key={court.id}
-            coordinate={{ latitude: court.latitude, longitude: court.longitude }}
-            onPress={(e) => {
-              e.stopPropagation();
-              focusCourt(court.id, court.latitude, court.longitude);
-            }}
-            anchor={{ x: 0.5, y: 1 }}
-            tracksViewChanges={Platform.OS === 'ios' ? false : selectedId === court.id}
-          >
-            <CourtMarker
-              court={court}
-              sessionCount={sessionCounts[court.id] ?? 0}
-              selected={selectedId === court.id}
-            />
-          </Marker>
-        ))}
-      </MapView>
+        courts={visibleCourts}
+        selectedId={selectedId}
+        sessionCounts={sessionCounts}
+        onSelect={handleSelect}
+        onDeselect={() => setSelectedId(null)}
+      />
 
       <SafeAreaView edges={['top']} style={styles.topOverlay} pointerEvents="box-none">
         <View style={styles.headerCard}>
