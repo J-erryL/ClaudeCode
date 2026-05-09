@@ -1,10 +1,10 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
-import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
+import { MapContainer, Marker, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CourtMarker } from './CourtMarker';
 import { colors } from '@/theme/colors';
-import type { Court } from '@/types';
+import type { Court, CourtRequest } from '@/types';
 import 'leaflet/dist/leaflet.css';
 
 export interface CourtsMapHandle {
@@ -13,10 +13,12 @@ export interface CourtsMapHandle {
 
 interface CourtsMapProps {
   courts: Court[];
+  pendingRequests: CourtRequest[];
   selectedId: string | null;
   sessionCounts: Record<string, number>;
   onSelect: (id: string) => void;
   onDeselect: () => void;
+  onMapPress?: (lat: number, lng: number) => void;
 }
 
 const SYDNEY_CENTER: [number, number] = [-33.885, 151.215];
@@ -38,10 +40,21 @@ function bubbleHtml(court: Court, count: number, selected: boolean) {
   `;
 }
 
+function pendingHtml() {
+  return `
+    <div style="display:flex;flex-direction:column;align-items:center;transform:translateY(-100%);">
+      <div style="width:36px;height:36px;border-radius:50%;background:${colors.textMuted};display:flex;align-items:center;justify-content:center;border:2px dashed #fff;box-shadow:0 2px 6px rgba(0,0,0,0.25);font-size:18px;font-weight:800;color:#fff;line-height:1;">?</div>
+      <div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid ${colors.textMuted};margin-top:-2px;"></div>
+    </div>
+  `;
+}
+
 function MapController({
   exposeFocus,
+  onMapPress,
 }: {
   exposeFocus: (focus: (lat: number, lng: number) => void) => void;
+  onMapPress?: (lat: number, lng: number) => void;
 }) {
   const map = useMap();
   useEffect(() => {
@@ -57,11 +70,32 @@ function MapController({
     return () => window.removeEventListener('resize', handler);
   }, [map]);
 
+  useEffect(() => {
+    if (!onMapPress) return;
+    const handler = (e: L.LeafletMouseEvent) => onMapPress(e.latlng.lat, e.latlng.lng);
+    map.on('click', handler);
+    return () => {
+      map.off('click', handler);
+    };
+  }, [map, onMapPress]);
+
+  return null;
+}
+
+function ClickAway({ onClick }: { onClick: () => void }) {
+  const map = useMap();
+  useEffect(() => {
+    const handler = () => onClick();
+    map.on('click', handler);
+    return () => {
+      map.off('click', handler);
+    };
+  }, [map, onClick]);
   return null;
 }
 
 export const CourtsMap = forwardRef<CourtsMapHandle, CourtsMapProps>(function CourtsMap(
-  { courts, selectedId, sessionCounts, onSelect, onDeselect },
+  { courts, pendingRequests, selectedId, sessionCounts, onSelect, onDeselect, onMapPress },
   ref,
 ) {
   const focusRef = useRef<(lat: number, lng: number) => void>(() => {});
@@ -70,7 +104,7 @@ export const CourtsMap = forwardRef<CourtsMapHandle, CourtsMapProps>(function Co
     focusCourt: (lat, lng) => focusRef.current(lat, lng),
   }));
 
-  const icons = useMemo(() => {
+  const courtIcons = useMemo(() => {
     const m: Record<string, L.DivIcon> = {};
     for (const court of courts) {
       const html = renderToStaticMarkup(
@@ -90,8 +124,19 @@ export const CourtsMap = forwardRef<CourtsMapHandle, CourtsMapProps>(function Co
     return m;
   }, [courts, sessionCounts, selectedId]);
 
+  const pendingIcon = useMemo(
+    () =>
+      L.divIcon({
+        html: renderToStaticMarkup(<div dangerouslySetInnerHTML={{ __html: pendingHtml() }} />),
+        className: 'rally-marker',
+        iconSize: [36, 45],
+        iconAnchor: [18, 45],
+      }),
+    [],
+  );
+
   return (
-    <div style={{ position: 'absolute', inset: 0 }}>
+    <div style={{ position: 'absolute', inset: 0, cursor: onMapPress ? 'crosshair' : 'auto' }}>
       <MapContainer
         center={SYDNEY_CENTER}
         zoom={13}
@@ -103,33 +148,31 @@ export const CourtsMap = forwardRef<CourtsMapHandle, CourtsMapProps>(function Co
           url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
           subdomains={['a', 'b', 'c', 'd']}
         />
-        <MapController exposeFocus={(fn) => (focusRef.current = fn)} />
+        <MapController exposeFocus={(fn) => (focusRef.current = fn)} onMapPress={onMapPress} />
         {courts.map((court) => (
           <Marker
             key={court.id}
             position={[court.latitude, court.longitude]}
-            icon={icons[court.id]}
+            icon={courtIcons[court.id]}
             eventHandlers={{
-              click: () => onSelect(court.id),
+              click: (e) => {
+                if (onMapPress) return;
+                L.DomEvent.stopPropagation(e.originalEvent);
+                onSelect(court.id);
+              },
             }}
-          >
-            <Popup>{court.name}</Popup>
-          </Marker>
+          />
         ))}
-        <ClickAway onClick={onDeselect} />
+        {pendingRequests.map((req) => (
+          <Marker
+            key={req.id}
+            position={[req.latitude, req.longitude]}
+            icon={pendingIcon}
+            interactive={false}
+          />
+        ))}
+        {!onMapPress && <ClickAway onClick={onDeselect} />}
       </MapContainer>
     </div>
   );
 });
-
-function ClickAway({ onClick }: { onClick: () => void }) {
-  const map = useMap();
-  useEffect(() => {
-    const handler = () => onClick();
-    map.on('click', handler);
-    return () => {
-      map.off('click', handler);
-    };
-  }, [map, onClick]);
-  return null;
-}

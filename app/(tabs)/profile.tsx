@@ -4,17 +4,28 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/Avatar';
 import { SessionRow } from '@/components/SessionRow';
+import { RequestRow } from '@/components/RequestRow';
 import { COURTS } from '@/data/courts';
 import { USERS } from '@/data/users';
-import { useAppStore, useFriendIds } from '@/store/useAppStore';
+import {
+  useAppStore,
+  useFriendIds,
+  useMyRequests,
+  usePendingRequests,
+} from '@/store/useAppStore';
 import { colors } from '@/theme/colors';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const currentUserId = useAppStore((s) => s.currentUserId);
+  const isAdmin = useAppStore((s) => s.isAdmin);
   const sessions = useAppStore((s) => s.sessions);
   const leaveSession = useAppStore((s) => s.leaveSession);
+  const approveRequest = useAppStore((s) => s.approveRequest);
+  const rejectRequest = useAppStore((s) => s.rejectRequest);
   const friendIds = useFriendIds();
+  const myRequests = useMyRequests();
+  const pendingRequests = usePendingRequests();
   const me = USERS.find((u) => u.id === currentUserId)!;
 
   const upcoming = useMemo(() => {
@@ -28,6 +39,8 @@ export default function ProfileScreen() {
   const hostingCount = sessions.filter(
     (s) => s.hostId === currentUserId && new Date(s.startTime).getTime() > Date.now(),
   ).length;
+
+  const adminQueue = pendingRequests.filter((r) => r.requestedById !== currentUserId);
 
   return (
     <SafeAreaView edges={['top']} style={styles.container}>
@@ -74,6 +87,41 @@ export default function ProfileScreen() {
               </Pressable>
             );
           })
+        )}
+
+        {myRequests.length > 0 && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Your court requests</Text>
+              <Text style={styles.sectionCount}>{myRequests.length}</Text>
+            </View>
+            {myRequests.map((req) => (
+              <RequestRow key={req.id} request={req} />
+            ))}
+          </>
+        )}
+
+        {isAdmin && adminQueue.length > 0 && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Admin · Pending review</Text>
+              <Text style={styles.sectionCount}>{adminQueue.length}</Text>
+            </View>
+            <View style={styles.adminBanner}>
+              <Text style={styles.adminBannerText}>
+                Approving adds the court to the map for everyone.
+              </Text>
+            </View>
+            {adminQueue.map((req) => (
+              <RequestRow
+                key={req.id}
+                request={req}
+                showRequester
+                onApprove={() => approveRequest(req.id)}
+                onReject={() => rejectRequest(req.id)}
+              />
+            ))}
+          </>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -143,13 +191,21 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
     marginBottom: 12,
-    marginTop: 4,
+    marginTop: 18,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '800',
     color: colors.text,
+    flex: 1,
+  },
+  sectionCount: {
+    fontSize: 14,
+    color: colors.textMuted,
+    fontWeight: '600',
   },
   empty: {
     backgroundColor: colors.surface,
@@ -179,5 +235,16 @@ const styles = StyleSheet.create({
   emptyCtaText: {
     color: '#FFFFFF',
     fontWeight: '700',
+  },
+  adminBanner: {
+    backgroundColor: colors.primaryLight,
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  adminBannerText: {
+    color: colors.primaryDark,
+    fontSize: 13,
+    fontWeight: '500',
   },
 });

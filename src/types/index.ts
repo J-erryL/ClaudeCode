@@ -40,3 +40,24 @@ export interface Friendship {
   userId: string;
   friendId: string;
 }
+
+export type RequestStatus = 'pending' | 'approved' | 'rejected';
+
+export interface CourtRequest {
+  id: string;
+  name: string;
+  type: CourtType;
+  sport: Sport;
+  latitude: number;
+  longitude: number;
+  suburb: string;
+  hoops: number;
+  lights: boolean;
+  notes?: string;
+  requestedById: string;
+  status: RequestStatus;
+  createdAt: string;
+  reviewedById?: string;
+  reviewedAt?: string;
+  rejectionReason?: string;
+}

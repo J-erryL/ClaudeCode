@@ -2,7 +2,8 @@ import { forwardRef, useImperativeHandle, useRef } from 'react';
 import { Platform, StyleSheet } from 'react-native';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { CourtMarker } from './CourtMarker';
-import type { Court } from '@/types';
+import { PendingMarker } from './PendingMarker';
+import type { Court, CourtRequest } from '@/types';
 
 export interface CourtsMapHandle {
   focusCourt: (lat: number, lng: number) => void;
@@ -10,10 +11,12 @@ export interface CourtsMapHandle {
 
 interface CourtsMapProps {
   courts: Court[];
+  pendingRequests: CourtRequest[];
   selectedId: string | null;
   sessionCounts: Record<string, number>;
   onSelect: (id: string) => void;
   onDeselect: () => void;
+  onMapPress?: (lat: number, lng: number) => void;
 }
 
 const SYDNEY_REGION = {
@@ -24,7 +27,7 @@ const SYDNEY_REGION = {
 };
 
 export const CourtsMap = forwardRef<CourtsMapHandle, CourtsMapProps>(function CourtsMap(
-  { courts, selectedId, sessionCounts, onSelect, onDeselect },
+  { courts, pendingRequests, selectedId, sessionCounts, onSelect, onDeselect, onMapPress },
   ref,
 ) {
   const mapRef = useRef<MapView>(null);
@@ -53,7 +56,14 @@ export const CourtsMap = forwardRef<CourtsMapHandle, CourtsMapProps>(function Co
       showsMyLocationButton={false}
       showsCompass={false}
       toolbarEnabled={false}
-      onPress={onDeselect}
+      onPress={(e) => {
+        if (onMapPress) {
+          const { latitude, longitude } = e.nativeEvent.coordinate;
+          onMapPress(latitude, longitude);
+        } else {
+          onDeselect();
+        }
+      }}
     >
       {courts.map((court) => (
         <Marker
@@ -61,7 +71,7 @@ export const CourtsMap = forwardRef<CourtsMapHandle, CourtsMapProps>(function Co
           coordinate={{ latitude: court.latitude, longitude: court.longitude }}
           onPress={(e) => {
             e.stopPropagation();
-            onSelect(court.id);
+            if (!onMapPress) onSelect(court.id);
           }}
           anchor={{ x: 0.5, y: 1 }}
           tracksViewChanges={Platform.OS === 'ios' ? false : selectedId === court.id}
@@ -71,6 +81,17 @@ export const CourtsMap = forwardRef<CourtsMapHandle, CourtsMapProps>(function Co
             sessionCount={sessionCounts[court.id] ?? 0}
             selected={selectedId === court.id}
           />
+        </Marker>
+      ))}
+      {pendingRequests.map((req) => (
+        <Marker
+          key={req.id}
+          coordinate={{ latitude: req.latitude, longitude: req.longitude }}
+          anchor={{ x: 0.5, y: 1 }}
+          tracksViewChanges={false}
+          title={`${req.name} (pending)`}
+        >
+          <PendingMarker />
         </Marker>
       ))}
     </MapView>
