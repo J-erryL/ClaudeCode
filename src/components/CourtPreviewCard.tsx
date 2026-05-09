@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors } from '@/theme/colors';
@@ -15,11 +16,14 @@ interface CourtPreviewCardProps {
 
 export function CourtPreviewCard({ court, onClose }: CourtPreviewCardProps) {
   const router = useRouter();
-  const sessions = useAppStore((s) =>
-    s.sessions
-      .filter((sess) => sess.courtId === court.id)
-      .filter((sess) => new Date(sess.startTime).getTime() > Date.now())
-      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()),
+  const allSessions = useAppStore((s) => s.sessions);
+  const sessions = useMemo(
+    () =>
+      allSessions
+        .filter((sess) => sess.courtId === court.id)
+        .filter((sess) => new Date(sess.startTime).getTime() > Date.now())
+        .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()),
+    [allSessions, court.id],
   );
 
   const next = sessions[0];

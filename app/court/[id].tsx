@@ -2,8 +2,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { COURTS } from '@/data/courts';
-import { useAppStore } from '@/store/useAppStore';
+import { useAllCourts, useAppStore } from '@/store/useAppStore';
 import { Pill } from '@/components/Pill';
 import { SessionRow } from '@/components/SessionRow';
 import { ScheduleSheet } from '@/components/ScheduleSheet';
@@ -14,13 +13,17 @@ export default function CourtDetailScreen() {
   const router = useRouter();
   const [scheduleOpen, setScheduleOpen] = useState(false);
 
-  const court = useMemo(() => COURTS.find((c) => c.id === id), [id]);
+  const allCourts = useAllCourts();
+  const court = useMemo(() => allCourts.find((c) => c.id === id), [allCourts, id]);
   const currentUserId = useAppStore((s) => s.currentUserId);
-  const sessions = useAppStore((s) =>
-    s.sessions
-      .filter((sess) => sess.courtId === id)
-      .filter((sess) => new Date(sess.startTime).getTime() > Date.now())
-      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()),
+  const allSessions = useAppStore((s) => s.sessions);
+  const sessions = useMemo(
+    () =>
+      allSessions
+        .filter((sess) => sess.courtId === id)
+        .filter((sess) => new Date(sess.startTime).getTime() > Date.now())
+        .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()),
+    [allSessions, id],
   );
   const addSession = useAppStore((s) => s.addSession);
   const joinSession = useAppStore((s) => s.joinSession);
