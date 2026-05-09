@@ -72,7 +72,11 @@ function MapController({
 
   useEffect(() => {
     if (!onMapPress) return;
-    const handler = (e: L.LeafletMouseEvent) => onMapPress(e.latlng.lat, e.latlng.lng);
+    const handler = (e: L.LeafletMouseEvent) => {
+      const target = e.originalEvent?.target as HTMLElement | null;
+      if (target?.closest('.leaflet-marker-icon')) return;
+      onMapPress(e.latlng.lat, e.latlng.lng);
+    };
     map.on('click', handler);
     return () => {
       map.off('click', handler);
@@ -85,7 +89,11 @@ function MapController({
 function ClickAway({ onClick }: { onClick: () => void }) {
   const map = useMap();
   useEffect(() => {
-    const handler = () => onClick();
+    const handler = (e: L.LeafletMouseEvent) => {
+      const target = e.originalEvent?.target as HTMLElement | null;
+      if (target?.closest('.leaflet-marker-icon')) return;
+      onClick();
+    };
     map.on('click', handler);
     return () => {
       map.off('click', handler);
