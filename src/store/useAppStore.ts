@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { create } from 'zustand';
 import type { Court, CourtRequest, Friendship, Session } from '@/types';
 import { SESSIONS } from '@/data/sessions';
@@ -146,21 +147,31 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 }));
 
-export const useFriendIds = () => {
-  return useAppStore((state) =>
-    state.friendships
-      .filter((f) => f.userId === state.currentUserId)
-      .map((f) => f.friendId),
+export const useFriendIds = (): string[] => {
+  const friendships = useAppStore((s) => s.friendships);
+  const currentUserId = useAppStore((s) => s.currentUserId);
+  return useMemo(
+    () =>
+      friendships.filter((f) => f.userId === currentUserId).map((f) => f.friendId),
+    [friendships, currentUserId],
   );
 };
 
 export const useAllCourts = (): Court[] => {
   const approved = useAppStore((s) => s.approvedCourts);
-  return [...COURTS, ...approved];
+  return useMemo(() => [...COURTS, ...approved], [approved]);
 };
 
-export const usePendingRequests = () =>
-  useAppStore((s) => s.requests.filter((r) => r.status === 'pending'));
+export const usePendingRequests = (): CourtRequest[] => {
+  const requests = useAppStore((s) => s.requests);
+  return useMemo(() => requests.filter((r) => r.status === 'pending'), [requests]);
+};
 
-export const useMyRequests = () =>
-  useAppStore((s) => s.requests.filter((r) => r.requestedById === s.currentUserId));
+export const useMyRequests = (): CourtRequest[] => {
+  const requests = useAppStore((s) => s.requests);
+  const currentUserId = useAppStore((s) => s.currentUserId);
+  return useMemo(
+    () => requests.filter((r) => r.requestedById === currentUserId),
+    [requests, currentUserId],
+  );
+};
