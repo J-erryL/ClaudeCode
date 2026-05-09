@@ -154,10 +154,10 @@ export const CourtsMap = forwardRef<CourtsMapHandle, CourtsMapProps>(function Co
             key={court.id}
             position={[court.latitude, court.longitude]}
             icon={courtIcons[court.id]}
+            bubblingMouseEvents={false}
             eventHandlers={{
-              click: (e) => {
+              click: () => {
                 if (onMapPress) return;
-                L.DomEvent.stopPropagation(e.originalEvent);
                 onSelect(court.id);
               },
             }}
